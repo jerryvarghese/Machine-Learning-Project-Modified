@@ -1,0 +1,128 @@
+---
+title: "Machine Learning Course Project"
+author: "Jerry"
+date: "December 21, 2016"
+output: html_document
+---
+Synopsis :
+This report detailed below is for the final project that we had to present for the Practical Machine Learning Class.
+
+Background :
+Human Activity Recognition - HAR - has emerged as a key research area in the last years and is gaining increasing attention by the pervasive computing research community (see picture below, that illustrates the increasing number of publications in HAR with wearable accelerometers), especially for the development of context-aware systems. There are many potential applications for HAR, like: elderly monitoring, life log systems for monitoring energy expenditure and for supporting weight-loss programs, and digital assistants for weight lifting exercises.
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it
+
+Purpose of the Project :
+
+The goal of this project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. I have created a report describing how you built my model model,cross validation used, the expected out of sample error is . I have also used this prediction model to predict 20 different test cases
+
+Data Preprocessing and Exploration :
+
+Reading the data and carrying out some basic data exploration.
+
+```{r,warning=FALSE,message=FALSE}
+library(caret)#loading all required libraries .
+library(ggplot2)
+library(rattle)
+library(rpart)
+library(rpart.plot)
+library(randomForest)
+library(corrplot)
+library(gbm)
+library(plyr)
+library(splines)
+TestData <- read.csv ("pml-testing.csv")
+TrainData <- read.csv ("pml-training.csv")
+dim(TrainData)
+dim(TestData)
+```
+
+The summary and str commands were run on the Train Set and we noticed that the data frame consisted of  160 variables and 19622 observations. However a large number of variables comprised mainy of NA's (Garbage Variables).
+
+We now go ahead and remove the Garbage Values and use only variables that we need.
+
+```{r}
+TrainTidy <- TrainData[,-c(grep("^amplitude|^kurtosis|^skewness|^avg|^cvtd_timestamp|^max|^min|^new_window|^raw_timestamp|^stddev|^var|^user_name|X",names(TrainData)))]
+table(complete.cases(TrainTidy))
+dim(TrainTidy)
+```
+
+We now have 54 complete variables that we can use for our analysis.
+
+Splitting the Data
+
+I have decided to split the data into Training and Test Data in 60:40 ratio.
+
+```{r}
+set.seed(610)
+inTrain <- createDataPartition(y=TrainTidy$classe,
+                               p=0.6,list=FALSE)
+TidyTrainData <- TrainTidy[inTrain,]
+TidyTestData <- TrainTidy[-inTrain,]
+```
+
+Model Selection
+1.One of the aims of the Project is look out forwhich algorithm suits the data better.
+2.The Kappa metric is selected as the comparison criteria.
+3.To reduce the risk of overfitting cross validation is employed during model building.
+
+The Random Forest Model
+```{r}
+
+set.seed(610)
+controlRF <- trainControl(method="cv", number=3, verboseIter=FALSE)
+RandForest <- train(classe ~ ., data=TidyTrainData, method="rf",
+                          trControl=controlRF)
+RandForest$finalModel
+predictRandForest <- predict(RandForest, newdata=TidyTestData)
+confMatRandForest <- confusionMatrix(predictRandForest, TidyTestData$classe)
+confMatRandForest
+```
+The Random Forest model has a accuracy of 0.9971 and Kappa Value of 0.9963
+
+
+The Decision Tree Method
+```{r}
+set.seed(610)
+FitDecTree <- rpart(classe ~ ., data=TidyTrainData, method="class")
+fancyRpartPlot(FitDecTree)
+predictDecTree <- predict(FitDecTree, newdata=TidyTestData, type="class")
+confMatDecTree <- confusionMatrix(predictDecTree, TidyTestData$classe)
+confMatDecTree
+```
+
+The Decision Tress has a accuracy of 0.7337 and a Kappa Value of 0.66
+
+
+The Generalized Boost Method
+
+```{r}
+set.seed(610)
+controlGBM <- trainControl(method = "repeatedcv", number = 5, repeats = 1)
+FitGBM  <- train(classe ~ ., data=TidyTrainData, method = "gbm",
+                    trControl = controlGBM, verbose = FALSE)
+FitGBM$finalModel
+```
+
+```{r}
+predictGBM <- predict(FitGBM, newdata=TidyTestData)
+confMatGBM <- confusionMatrix(predictGBM, TidyTestData$classe)
+confMatGBM
+```
+
+The GBM Method has a accuracy of 0.9871 and a kappa value of 0.9837
+
+
+Model Selection
+1. Looking at the 3 models it can be determined that the RandomForest algorithm fares better than the Gradient Boosting algorithm for this dataset, achieving a Kappa mean value of 0.996. It can also be seen that the RandomForest algorithm also displays less spread than Gradient Boosting.
+Therefore, the RandomForest model is selected for this dataset.
+
+
+Final Model Testing
+
+Finally we test the Random Forest Model on the Test data to predict the 20 values that we need for the next quiz
+```{r}
+predictTEST <- predict(RandForest, newdata=TestData)
+predictTEST
+```
+
